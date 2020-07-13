@@ -27,7 +27,6 @@ class HtmlController(private val repository: ArticleRepository,private val prope
     }
     */
 
-
     @GetMapping("/article/{slug}")
     fun article(@PathVariable slug: String, model: Model): String {
         val article = repository

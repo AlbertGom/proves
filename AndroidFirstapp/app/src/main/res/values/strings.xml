@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">FirstApp</string>
+    <string name="what_s_your_name">What\'s your name?</string>
+    <string name="name">Name</string>
+    <string name="go">GO</string>
+    <string name="back">back</string>
+    <string name="welcome">Welcome</string>
+    <string name="heroes">Heroes</string>
+    <string name="todo">TODO</string>
+    <string name="tasks">Tasks</string>
+    <string name="add_task">Add task</string>
+    <string name="add">add</string>
+</resources>
