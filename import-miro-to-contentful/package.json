@@ -1,0 +1,21 @@
+{
+  "name": "import-miro-to-contentful",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^17.0.9",
+    "typescript": "^4.5.4"
+  },
+  "dependencies": {
+    "@botonic/plugin-contentful": "^0.20.0",
+    "axios": "^0.24.0",
+    "ts-node": "^10.4.0"
+  }
+}
