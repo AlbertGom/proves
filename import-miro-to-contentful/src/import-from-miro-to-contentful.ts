@@ -165,7 +165,7 @@ async function main() {
     console.log("Importing flow from Miro...");
     const flow = await readFlowFromMiro(miroBoardId, miroToken, usingMiroLinks);
     console.log("Miro flow imported");
-    console.log("Writing flow to Contentful...");
+    console.log("Writing Miro flow to Contentful...");
     await writeFlowToContentful(spaceId, env, contentfulToken, locale, flow);
     console.log("Done");
   } catch (e) {}
