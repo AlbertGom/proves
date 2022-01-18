@@ -10,11 +10,7 @@ import {
 } from "./miro";
 import { ContentId, ContentType } from "@botonic/plugin-contentful";
 import { ManageContentful } from "@botonic/plugin-contentful/lib/contentful/manage";
-import {
-  generateRandomName,
-  generateRandomUUID,
-  processMiroText,
-} from "./utils";
+import { generateRandomName, processMiroText } from "./utils";
 import { ContentFieldType } from "@botonic/plugin-contentful/lib/manage-cms/fields";
 
 if (process.argv.length < 8 || process.argv[2] == "--help") {
