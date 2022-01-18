@@ -10,7 +10,11 @@ import {
 } from "./miro";
 import { ContentId, ContentType } from "@botonic/plugin-contentful";
 import { ManageContentful } from "@botonic/plugin-contentful/lib/contentful/manage";
-import { generateRandomUUID } from "./utils";
+import {
+  generateRandomName,
+  generateRandomUUID,
+  processMiroText,
+} from "./utils";
 import { ContentFieldType } from "@botonic/plugin-contentful/lib/manage-cms/fields";
 
 if (process.argv.length < 8 || process.argv[2] == "--help") {
@@ -37,7 +41,7 @@ async function readFlowFromMiro(
     return content.style.backgroundColor === "#99caff";
   });
   const miroTexts = texts.map((text: any) => {
-    return new MiroText(text.id, text.text.split(">")[1].split("<")[0]);
+    return new MiroText(text.id, processMiroText(text.text));
   });
   const buttons = MiroContents.data.data.filter((content: any) => {
     return (
@@ -49,7 +53,7 @@ async function readFlowFromMiro(
   const miroButtons = buttons.map((button: any) => {
     return new MiroButton(
       button.id,
-      button.text.split(">")[1].split("<")[0],
+      processMiroText(button.text),
       isQuickReply(button.style.backgroundColor)
     );
   });
@@ -110,13 +114,11 @@ async function writeFlowToContentful(
   };
   for (const content of flow) {
     const contentType = content.type as ContentType;
-    const newId = generateRandomUUID();
     await manageContentful.createContent(
       manageContentfulContext,
       contentType,
-      newId
+      content.id
     );
-    content.id = newId;
   }
 
   for (const content of flow) {
@@ -125,9 +127,7 @@ async function writeFlowToContentful(
         manageContentfulContext,
         new ContentId(content.type as ContentType, content.id),
         {
-          [ContentFieldType.NAME]: (Math.random() + 1)
-            .toString(36)
-            .substring(2),
+          [ContentFieldType.NAME]: generateRandomName(),
           [ContentFieldType.TEXT]: content.text,
           [ContentFieldType.BUTTONS]: (content as MiroText).buttons.map(
             (button: MiroButton) => {
@@ -143,9 +143,7 @@ async function writeFlowToContentful(
         manageContentfulContext,
         new ContentId(content.type as ContentType, content.id),
         {
-          [ContentFieldType.NAME]: (Math.random() + 1)
-            .toString(36)
-            .substring(2),
+          [ContentFieldType.NAME]: generateRandomName(),
           [ContentFieldType.TEXT]: content.text,
           [ContentFieldType.TARGET]: (content as MiroButton).target?.id,
         }

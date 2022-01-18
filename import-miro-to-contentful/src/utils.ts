@@ -1,4 +1,4 @@
-export function generateRandomUUID() {
+export function generateRandomUUID(): string {
   let dt = new Date().getTime();
   const uuid = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
     /[xy]/g,
@@ -9,4 +9,12 @@ export function generateRandomUUID() {
     }
   );
   return uuid;
+}
+
+export function processMiroText(miroText: string): string {
+  return miroText;
+}
+
+export function generateRandomName(): string {
+  return (Math.random() + 1).toString(36).substring(2);
 }
