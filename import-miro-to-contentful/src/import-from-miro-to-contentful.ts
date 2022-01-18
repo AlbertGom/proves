@@ -76,6 +76,8 @@ async function readFlowFromMiro(
         (origin as MiroText).buttons.push(end as MiroButton);
         if ((end as MiroButton).quickReply) {
           (origin as MiroText).buttonsStyle = "QuickReplies";
+        } else {
+          (origin as MiroText).buttonsStyle = "Buttons";
         }
       }
     } else if (origin && origin.type === "button") {
@@ -133,7 +135,7 @@ async function writeFlowToContentful(
             }
           ),
           [ContentFieldType.FOLLOW_UP]: (content as MiroText).followup?.id,
-          //[ContentFieldType.BUTTONS_STYLE]: (content as MiroText).buttonsStyle,
+          [ContentFieldType.BUTTONS_STYLE]: (content as MiroText).buttonsStyle,
         }
       );
     } else if (content.type === ContentTypes.BUTTON) {
@@ -162,10 +164,10 @@ const locale = process.argv[8];
 
 async function main() {
   try {
-    console.log("Importing flow from Miro");
+    console.log("Importing flow from Miro...");
     const flow = await readFlowFromMiro(miroBoardId, miroToken, usingMiroLinks);
     console.log("Miro flow imported");
-    console.log("Writing flow to Contentful");
+    console.log("Writing flow to Contentful...");
     await writeFlowToContentful(spaceId, env, contentfulToken, locale, flow);
     console.log("Done");
   } catch (e) {}
