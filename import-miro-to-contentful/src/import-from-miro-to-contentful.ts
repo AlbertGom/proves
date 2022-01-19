@@ -1,14 +1,16 @@
 import axios from "axios";
-import { ContentTypes, MIRO_CONTENT_TYPES } from "./constants";
+import { BUTTON_STYLES, ContentTypes, MIRO_CONTENT_TYPES } from "./constants";
 import {
   getContentById,
+  getContentByText,
   isQuickReply,
   Link,
   MiroButton,
   MiroContent,
+  MiroSubflowConnector,
   MiroText,
 } from "./miro";
-import { ContentId, ContentType } from "@botonic/plugin-contentful";
+import { Content, ContentId, ContentType } from "@botonic/plugin-contentful";
 import { ManageContentful } from "@botonic/plugin-contentful/lib/contentful/manage";
 import { generateRandomName, processMiroText } from "./utils";
 import { ContentFieldType } from "@botonic/plugin-contentful/lib/manage-cms/fields";
@@ -41,7 +43,6 @@ async function readFlowFromMiro(
   });
   const buttons = MiroContents.data.data.filter((content: any) => {
     return (
-      content.style.backgroundColor === "#e6e6e6" ||
       content.style.backgroundColor === "#ffffffff" ||
       content.style.backgroundColor === "#12cdd4"
     );
@@ -53,38 +54,107 @@ async function readFlowFromMiro(
       isQuickReply(button.style.backgroundColor)
     );
   });
-  const MiroLinks = await axios({
+
+  const subflowConnectors = MiroContents.data.data.filter((content: any) => {
+    return (
+      content.style.backgroundColor === "#9510ac" ||
+      content.style.backgroundColor === "#e6e6e6"
+    );
+  });
+  const miroSubflowConnectors = subflowConnectors.map(
+    (subflowConnector: any) => {
+      const contentType =
+        subflowConnector.style.backgroundColor === "#9510ac"
+          ? ContentTypes.START_OF_SUBFLOW_CONNECTOR
+          : ContentTypes.SUBFLOW_CONNECTOR;
+      return new MiroSubflowConnector(
+        subflowConnector.id,
+        processMiroText(subflowConnector.text),
+        contentType
+      );
+    }
+  );
+
+  const Links = await axios({
     method: "get",
     url: miroUrl,
     headers: { Authorization: `Bearer ${miroToken}` },
     params: { widgetType: MIRO_CONTENT_TYPES.LINK },
   });
 
-  const links = MiroLinks.data.data.map((link: any) => {
+  const miroLinks = Links.data.data.map((link: any) => {
     return new Link(link.startWidget.id, link.endWidget.id);
   });
 
-  const miroContents: MiroContent[] = miroTexts.concat(miroButtons);
+  let miroContents: MiroContent[] = miroTexts.concat(
+    miroButtons,
+    miroSubflowConnectors
+  );
 
-  links.forEach((link: Link) => {
+  miroLinks.forEach((link: Link) => {
     const origin = getContentById(miroContents, link.start);
     const end = getContentById(miroContents, link.end);
-    if (origin && origin.type === "text") {
-      if (end && end.type === "text") {
+
+    if (origin && origin.type === ContentTypes.TEXT) {
+      if (end && end.type === ContentTypes.TEXT) {
         (origin as MiroText).followup = end as MiroText;
-      } else if (end && end.type === "button") {
+      } else if (end && end.type === ContentTypes.BUTTON) {
         (origin as MiroText).buttons.push(end as MiroButton);
         if ((end as MiroButton).quickReply) {
-          (origin as MiroText).buttonsStyle = "QuickReplies";
+          (origin as MiroText).buttonsStyle = BUTTON_STYLES.QUICK_REPLIES;
         } else {
-          (origin as MiroText).buttonsStyle = "Buttons";
+          (origin as MiroText).buttonsStyle = BUTTON_STYLES.BUTTONS;
         }
+      } else if (end && end.type === ContentTypes.SUBFLOW_CONNECTOR) {
+        (end as MiroSubflowConnector).connectsTo = origin as MiroText;
       }
-    } else if (origin && origin.type === "button") {
-      if (end && end.type === "text") {
+    } else if (origin && origin.type === ContentTypes.BUTTON) {
+      if (end && end.type === ContentTypes.TEXT) {
         (origin as MiroButton).target = end as MiroText;
+      } else if (end && end.type == ContentTypes.SUBFLOW_CONNECTOR) {
+        (end as MiroSubflowConnector).connectsTo = origin as MiroButton;
+      }
+    } else if (
+      origin &&
+      origin.type == ContentTypes.START_OF_SUBFLOW_CONNECTOR
+    ) {
+      if (end && end.type === ContentTypes.TEXT) {
+        (origin as MiroSubflowConnector).connectsTo = end as MiroText;
       }
     } else return;
+  });
+
+  miroContents.forEach((miroContent: MiroContent) => {
+    if (miroContent.type === ContentTypes.SUBFLOW_CONNECTOR) {
+      const startOfSubflow = getContentByText(
+        miroContents,
+        miroContent.text,
+        ContentTypes.START_OF_SUBFLOW_CONNECTOR
+      );
+      if (!startOfSubflow) {
+        return;
+      }
+      const origin = getContentById(
+        miroContents,
+        (miroContent as MiroSubflowConnector).connectsTo.id
+      );
+      const end = getContentById(
+        miroContents,
+        (startOfSubflow as MiroSubflowConnector).connectsTo.id
+      );
+      if (origin.type === ContentTypes.BUTTON) {
+        (origin as MiroButton).target = end as MiroText;
+      } else if (origin.type === ContentTypes.TEXT) {
+        (origin as MiroText).followup = end as MiroText;
+      }
+    }
+  });
+
+  miroContents = miroContents.filter((miroContent: MiroContent) => {
+    return (
+      miroContent.type === ContentTypes.BUTTON ||
+      miroContent.type === ContentTypes.TEXT
+    );
   });
 
   return miroContents;
@@ -108,6 +178,7 @@ async function writeFlowToContentful(
     preview: false,
     locale: locale,
   };
+
   for (const content of flow) {
     const contentType = content.type as ContentType;
     await manageContentful.createContent(
@@ -158,12 +229,12 @@ const locale = process.argv[8];
 
 async function main() {
   try {
-    console.log("Importing flow from Miro...");
+    console.log("📖️ Importing flow from Miro...");
     const flow = await readFlowFromMiro(miroBoardId, miroToken, usingMiroLinks);
-    console.log("Miro flow imported");
-    console.log("Writing Miro flow to Contentful...");
+    console.log("✅️ Miro flow imported");
+    console.log("🖊️ Writing Miro flow to Contentful...");
     await writeFlowToContentful(spaceId, env, contentfulToken, locale, flow);
-    console.log("Done");
+    console.log("✅️ Miro Flow copied to Contentful");
   } catch (e) {}
 }
 
