@@ -1,3 +1,6 @@
+import { Y_MARGIN } from "./import-from-miro-to-contentful";
+import { Coordinate } from "./miro";
+
 export function processMiroText(miroText: string): string {
   miroText = removeTags(miroText);
   miroText = convertHtmlEncodedChars(miroText);
@@ -6,6 +9,20 @@ export function processMiroText(miroText: string): string {
 
 export function generateRandomName(): string {
   return (Math.random() + 1).toString(36).substring(2);
+}
+
+export function elementNearToElement(
+  subElement: Coordinate,
+  element: Coordinate,
+  xMargin: number,
+  yMargin: number
+): boolean {
+  return (
+    subElement.x <= element.x + xMargin &&
+    subElement.x >= element.x - xMargin &&
+    subElement.y <= element.y + yMargin + Y_MARGIN &&
+    subElement.y >= element.y - yMargin - Y_MARGIN
+  );
 }
 
 function removeTags(miroText: string): string {

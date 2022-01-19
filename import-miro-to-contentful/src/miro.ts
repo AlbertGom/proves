@@ -8,6 +8,15 @@ export type ContentType =
   | "subflowConnector"
   | "startOfSubflowConnector";
 
+export class Coordinate {
+  x: number;
+  y: number;
+  constructor(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+  }
+}
+
 export class Link {
   readonly start: string;
   readonly end: string;
@@ -43,10 +52,23 @@ export class MiroSubflowConnector extends MiroContent {
 
 export class MiroButton extends MiroContent {
   target?: MiroText;
+  coordinates: Coordinate;
   readonly quickReply: boolean;
-  constructor(id: string, text: string, quickReply: boolean) {
+  textHeight: number;
+  belongsTo?: MiroText;
+  constructor(
+    id: string,
+    text: string,
+    quickReply: boolean,
+    coordinates: Coordinate,
+    textHeight: number,
+    belongsTo?: MiroText
+  ) {
     super(id, ContentTypes.BUTTON, text);
     this.quickReply = quickReply;
+    this.coordinates = coordinates;
+    this.textHeight = textHeight;
+    this.belongsTo = belongsTo;
   }
 }
 
@@ -54,11 +76,20 @@ export type ButtonsStyle = "QuickReplies" | "Buttons";
 
 export class MiroText extends MiroContent {
   buttons: MiroButton[];
+  coordinates: Coordinate;
+  textHeight: number;
   followup?: MiroText;
   buttonsStyle?: ButtonsStyle;
-  constructor(id: string, text: string) {
+  constructor(
+    id: string,
+    text: string,
+    coordinates: Coordinate,
+    textHeight: number
+  ) {
     super(id, ContentTypes.TEXT, text);
     this.buttons = [];
+    this.coordinates = coordinates;
+    this.textHeight = textHeight;
   }
 }
 
