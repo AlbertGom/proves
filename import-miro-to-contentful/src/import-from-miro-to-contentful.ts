@@ -10,12 +10,13 @@ import {
   MiroSubflowConnector,
   MiroText,
 } from "./miro";
-import { Content, ContentId, ContentType } from "@botonic/plugin-contentful";
+import { ContentId, ContentType } from "@botonic/plugin-contentful";
 import { ManageContentful } from "@botonic/plugin-contentful/lib/contentful/manage";
 import { generateRandomName, processMiroText } from "./utils";
 import { ContentFieldType } from "@botonic/plugin-contentful/lib/manage-cms/fields";
+import * as contentful from "contentful";
 
-if (process.argv.length < 8 || process.argv[2] == "--help") {
+if (process.argv.length < 9 || process.argv[2] == "--help") {
   console.log(`Usage: `);
   // eslint-disable-next-line no-process-exit
   process.exit(1);
@@ -163,15 +164,28 @@ async function readFlowFromMiro(
 async function writeFlowToContentful(
   spaceId: string,
   env: string,
-  contentfulToken: string,
+  contentfulManageToken: string,
+  contentfulDeliveryToken: string,
   locale: string,
   flow: MiroContent[]
 ): Promise<void> {
   const manageContentful = new ManageContentful({
-    accessToken: contentfulToken,
+    accessToken: contentfulManageToken,
     environment: env,
     spaceId: spaceId,
   });
+
+  const Contentful = contentful.createClient({
+    space: spaceId,
+    accessToken: contentfulDeliveryToken,
+    environment: env,
+  });
+
+  const actualContentfulEntries = (await Contentful.getEntries()).items.map(
+    (entry: any) => {
+      return entry.sys.id;
+    }
+  );
 
   const manageContentfulContext = {
     allowOverwrites: true,
@@ -179,7 +193,11 @@ async function writeFlowToContentful(
     locale: locale,
   };
 
-  for (const content of flow) {
+  const newContent = flow.filter((content: MiroContent) => {
+    return !actualContentfulEntries.includes(content.id);
+  });
+
+  for (const content of newContent) {
     const contentType = content.type as ContentType;
     await manageContentful.createContent(
       manageContentfulContext,
@@ -224,8 +242,9 @@ const miroToken = process.argv[3];
 const usingMiroLinks = process.argv[4];
 const spaceId = process.argv[5];
 const env = process.argv[6];
-const contentfulToken = process.argv[7];
-const locale = process.argv[8];
+const contentfulManageToken = process.argv[7];
+const contentfulDeliveryToken = process.argv[8];
+const locale = process.argv[9];
 
 async function main() {
   try {
@@ -233,7 +252,14 @@ async function main() {
     const flow = await readFlowFromMiro(miroBoardId, miroToken, usingMiroLinks);
     console.log("✅️ Miro flow imported");
     console.log("🖊️ Writing Miro flow to Contentful...");
-    await writeFlowToContentful(spaceId, env, contentfulToken, locale, flow);
+    await writeFlowToContentful(
+      spaceId,
+      env,
+      contentfulManageToken,
+      contentfulDeliveryToken,
+      locale,
+      flow
+    );
     console.log("✅️ Miro Flow copied to Contentful");
   } catch (e) {}
 }

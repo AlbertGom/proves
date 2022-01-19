@@ -16,6 +16,7 @@
   "dependencies": {
     "@botonic/plugin-contentful": "^0.20.0",
     "axios": "^0.24.0",
+    "contentful": "^9.1.5",
     "ts-node": "^10.4.0"
   }
 }

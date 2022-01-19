@@ -8,6 +8,8 @@ export const MIRO_CONTENT_TYPES: Record<string, string> = {
 export const ContentTypes: Record<string, ContentType> = {
   TEXT: "text",
   BUTTON: "button",
+  PAYLOAD: "payload",
+  URL: "url",
   SUBFLOW_CONNECTOR: "subflowConnector",
   START_OF_SUBFLOW_CONNECTOR: "startOfSubflowConnector",
 };
