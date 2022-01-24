@@ -1,4 +1,4 @@
-import { ContentTypes } from "./constants";
+import { COLORS_PER_COMPONENT, ContentTypes } from "./constants";
 
 export type ContentType =
   | "button"
@@ -6,7 +6,8 @@ export type ContentType =
   | "payload"
   | "url"
   | "subflowConnector"
-  | "startOfSubflowConnector";
+  | "startOfSubflowConnector"
+  | "componentName";
 
 export class Coordinate {
   x: number;
@@ -50,11 +51,20 @@ export class MiroSubflowConnector extends MiroContent {
   }
 }
 
+export class ComponentName extends MiroContent {
+  references?: MiroText;
+  referencedBy?: MiroButton;
+  constructor(id: string, text: string) {
+    super(id, ContentTypes.COMPONENT_NAME, text);
+  }
+}
+
 export class MiroButton extends MiroContent {
   target?: MiroText;
   coordinates: Coordinate;
   readonly quickReply: boolean;
   textHeight: number;
+  name: string;
   belongsTo?: MiroText;
   constructor(
     id: string,
@@ -78,6 +88,7 @@ export class MiroText extends MiroContent {
   buttons: MiroButton[];
   coordinates: Coordinate;
   textHeight: number;
+  name?: string;
   followup?: MiroText;
   buttonsStyle?: ButtonsStyle;
   constructor(
@@ -115,5 +126,5 @@ export function getContentByText(
 }
 
 export function isQuickReply(backgroundColor: string): boolean {
-  return backgroundColor === "#12cdd4" ? true : false;
+  return backgroundColor === COLORS_PER_COMPONENT.QUICK_REPLY ? true : false;
 }

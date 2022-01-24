@@ -1,6 +1,12 @@
 import axios from "axios";
-import { BUTTON_STYLES, ContentTypes, MIRO_CONTENT_TYPES } from "./constants";
 import {
+  BUTTON_STYLES,
+  COLORS_PER_COMPONENT,
+  ContentTypes,
+  MIRO_CONTENT_TYPES,
+} from "./constants";
+import {
+  ComponentName,
   Coordinate,
   getContentById,
   getContentByText,
@@ -37,6 +43,19 @@ async function readFlowFromMiro(
 ): Promise<MiroContent[]> {
   const miroUrl = `https://api.miro.com/v1/boards/${miroBoardId}=/widgets/`;
 
+  const MiroContentsLegend = await axios({
+    method: "get",
+    url: miroUrl,
+    headers: { Authorization: `Bearer ${miroToken}` },
+    params: { widgetType: MIRO_CONTENT_TYPES.FRAME },
+  });
+
+  const miroContentsLegendIds = MiroContentsLegend.data.data.map(
+    (miroContentLegend: any) => {
+      return miroContentLegend.id;
+    }
+  );
+
   const MiroContents = await axios({
     method: "get",
     url: miroUrl,
@@ -45,7 +64,7 @@ async function readFlowFromMiro(
   });
 
   const texts = MiroContents.data.data.filter((content: any) => {
-    return content.style.backgroundColor === "#99caff";
+    return content.style.backgroundColor === COLORS_PER_COMPONENT.TEXT;
   });
   const miroTexts = texts.map((text: any) => {
     return new MiroText(
@@ -57,8 +76,8 @@ async function readFlowFromMiro(
   });
   const buttons = MiroContents.data.data.filter((content: any) => {
     return (
-      content.style.backgroundColor === "#ffffffff" ||
-      content.style.backgroundColor === "#12cdd4"
+      content.style.backgroundColor === COLORS_PER_COMPONENT.BUTTON ||
+      content.style.backgroundColor === COLORS_PER_COMPONENT.QUICK_REPLY
     );
   });
   const miroButtons = buttons.map((button: any) => {
@@ -73,14 +92,17 @@ async function readFlowFromMiro(
 
   const subflowConnectors = MiroContents.data.data.filter((content: any) => {
     return (
-      content.style.backgroundColor === "#9510ac" ||
-      content.style.backgroundColor === "#e6e6e6"
+      content.style.backgroundColor ===
+        COLORS_PER_COMPONENT.SUBFLOW_CONNECTOR ||
+      content.style.backgroundColor ===
+        COLORS_PER_COMPONENT.START_OF_SUBFLOW_CONNECTOR
     );
   });
   const miroSubflowConnectors = subflowConnectors.map(
     (subflowConnector: any) => {
       const contentType =
-        subflowConnector.style.backgroundColor === "#9510ac"
+        subflowConnector.style.backgroundColor ===
+        COLORS_PER_COMPONENT.START_OF_SUBFLOW_CONNECTOR
           ? ContentTypes.START_OF_SUBFLOW_CONNECTOR
           : ContentTypes.SUBFLOW_CONNECTOR;
       return new MiroSubflowConnector(
@@ -90,6 +112,19 @@ async function readFlowFromMiro(
       );
     }
   );
+
+  const componentNames = MiroContents.data.data.filter((content: any) => {
+    return (
+      content.style.backgroundColor === COLORS_PER_COMPONENT.COMPONENT_NAME
+    );
+  });
+
+  const miroComponentNames = componentNames.map((componentName: any) => {
+    return new ComponentName(
+      componentName.id,
+      processMiroText(componentName.text)
+    );
+  });
 
   const Links = await axios({
     method: "get",
@@ -114,6 +149,9 @@ async function readFlowFromMiro(
           )
         ) {
           miroButton.belongsTo = miroText;
+          miroText.buttonsStyle = miroButton.quickReply
+            ? BUTTON_STYLES.QUICK_REPLIES
+            : BUTTON_STYLES.BUTTONS;
         }
       });
     });
@@ -143,7 +181,8 @@ async function readFlowFromMiro(
 
   let miroContents: MiroContent[] = miroTexts.concat(
     miroButtons,
-    miroSubflowConnectors
+    miroSubflowConnectors,
+    miroComponentNames
   );
 
   miroLinks.forEach((link: Link) => {
@@ -168,8 +207,10 @@ async function readFlowFromMiro(
     } else if (origin && origin.type === ContentTypes.BUTTON) {
       if (end && end.type === ContentTypes.TEXT) {
         (origin as MiroButton).target = end as MiroText;
-      } else if (end && end.type == ContentTypes.SUBFLOW_CONNECTOR) {
+      } else if (end && end.type === ContentTypes.SUBFLOW_CONNECTOR) {
         (end as MiroSubflowConnector).connectsTo = origin as MiroButton;
+      } else if (end && end.type === ContentTypes.COMPONENT_NAME) {
+        (end as ComponentName).referencedBy = origin as MiroButton;
       }
     } else if (
       origin &&
@@ -177,6 +218,11 @@ async function readFlowFromMiro(
     ) {
       if (end && end.type === ContentTypes.TEXT) {
         (origin as MiroSubflowConnector).connectsTo = end as MiroText;
+      }
+    } else if (origin && origin.type === ContentTypes.COMPONENT_NAME) {
+      if (end && end.type === ContentTypes.TEXT) {
+        (origin as ComponentName).references = end as MiroText;
+        (end as MiroText).name = origin.text;
       }
     } else return;
   });
@@ -204,6 +250,48 @@ async function readFlowFromMiro(
       } else if (origin.type === ContentTypes.TEXT) {
         (origin as MiroText).followup = end as MiroText;
       }
+    } else if (miroContent.type === ContentTypes.COMPONENT_NAME) {
+      if ((miroContent as ComponentName).referencedBy) {
+        const button = getContentById(
+          miroContents,
+          (miroContent as ComponentName).referencedBy.id
+        );
+        const text = getContentById(
+          miroContents,
+          (miroContent as ComponentName).references.id
+        );
+        if (button && text) {
+          (button as MiroButton).target = text as MiroText;
+        }
+      }
+    }
+  });
+
+  const textsWithNames = miroContents.filter((miroContent: MiroContent) => {
+    return (
+      miroContent.type === ContentTypes.TEXT && (miroContent as MiroText).name
+    );
+  });
+
+  textsWithNames.forEach((textWithName: MiroText) => {
+    nameFollowups(textWithName, 1, textWithName.name);
+  });
+
+  const textsWithButtons = miroContents.filter((miroContent: MiroContent) => {
+    return (
+      miroContent.type === ContentTypes.TEXT &&
+      (miroContent as MiroText).buttons.length
+    );
+  });
+
+  textsWithButtons.forEach((textWithButtons: MiroText) => {
+    if (textWithButtons.name) {
+      textWithButtons.buttons.forEach((button: MiroButton, index: number) => {
+        const treeLevel = parseInt(textWithButtons.name.split(" ")[0]);
+        button.name = !Number.isNaN(treeLevel)
+          ? `${treeLevel}.${index + 1} ${button.text}`
+          : `${textWithButtons.name} button_${index + 1}`;
+      });
     }
   });
 
@@ -215,6 +303,16 @@ async function readFlowFromMiro(
   });
 
   return miroContents;
+}
+
+function nameFollowups(
+  miroText: MiroText,
+  index: number,
+  baseName: string
+): void {
+  if (!miroText.followup) return;
+  miroText.followup.name = `${baseName} Followup ${index}`;
+  nameFollowups(miroText.followup, index + 1, baseName);
 }
 
 async function writeFlowToContentful(
@@ -268,7 +366,8 @@ async function writeFlowToContentful(
         manageContentfulContext,
         new ContentId(content.type as ContentType, content.id),
         {
-          [ContentFieldType.NAME]: generateRandomName(),
+          [ContentFieldType.NAME]:
+            (content as MiroText).name ?? generateRandomName(),
           [ContentFieldType.TEXT]: content.text,
           [ContentFieldType.BUTTONS]: (content as MiroText).buttons.map(
             (button: MiroButton) => {
@@ -309,14 +408,14 @@ async function main() {
     const flow = await readFlowFromMiro(miroBoardId, miroToken, usingMiroLinks);
     console.log("✅️ Miro flow imported");
     console.log("🖊️ Writing Miro flow to Contentful...");
-    await writeFlowToContentful(
-      spaceId,
-      env,
-      contentfulManageToken,
-      contentfulDeliveryToken,
-      locale,
-      flow
-    );
+    // await writeFlowToContentful(
+    //   spaceId,
+    //   env,
+    //   contentfulManageToken,
+    //   contentfulDeliveryToken,
+    //   locale,
+    //   flow
+    // );
     console.log("✅️ Miro Flow copied to Contentful");
   } catch (e) {}
 }
