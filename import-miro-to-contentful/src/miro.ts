@@ -5,9 +5,10 @@ export type ContentType =
   | "text"
   | "payload"
   | "url"
-  | "subflowConnector"
-  | "startOfSubflowConnector"
-  | "componentName";
+  | "subflow connector"
+  | "subflow start"
+  | "text name"
+  | "quick reply";
 
 export class Coordinate {
   x: number;

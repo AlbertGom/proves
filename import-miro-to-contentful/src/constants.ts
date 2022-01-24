@@ -9,11 +9,12 @@ export const MIRO_CONTENT_TYPES: Record<string, string> = {
 export const ContentTypes: Record<string, ContentType> = {
   TEXT: "text",
   BUTTON: "button",
+  QUICK_REPLY: "quick reply",
   PAYLOAD: "payload",
   URL: "url",
-  SUBFLOW_CONNECTOR: "subflowConnector",
-  START_OF_SUBFLOW_CONNECTOR: "startOfSubflowConnector",
-  COMPONENT_NAME: "componentName",
+  SUBFLOW_CONNECTOR: "subflow connector",
+  START_OF_SUBFLOW_CONNECTOR: "subflow start",
+  COMPONENT_NAME: "text name",
 };
 
 export const BUTTON_STYLES: Record<string, ButtonsStyle> = {

@@ -1,10 +1,5 @@
 import axios from "axios";
-import {
-  BUTTON_STYLES,
-  COLORS_PER_COMPONENT,
-  ContentTypes,
-  MIRO_CONTENT_TYPES,
-} from "./constants";
+import { BUTTON_STYLES, ContentTypes, MIRO_CONTENT_TYPES } from "./constants";
 import {
   ComponentName,
   Coordinate,
@@ -50,9 +45,9 @@ async function readFlowFromMiro(
     params: { widgetType: MIRO_CONTENT_TYPES.FRAME },
   });
 
-  const miroContentsLegendIds = MiroContentsLegend.data.data.map(
-    (miroContentLegend: any) => {
-      return miroContentLegend.id;
+  const miroContentsLegendIds = MiroContentsLegend.data.data[0].children.map(
+    (miroContentLegendId: any) => {
+      return miroContentLegendId;
     }
   );
 
@@ -63,9 +58,31 @@ async function readFlowFromMiro(
     params: { widgetType: MIRO_CONTENT_TYPES.SHAPE },
   });
 
-  const texts = MiroContents.data.data.filter((content: any) => {
-    return content.style.backgroundColor === COLORS_PER_COMPONENT.TEXT;
+  const legendContents = MiroContents.data.data.filter((MiroContent: any) => {
+    return miroContentsLegendIds.includes(MiroContent.id);
   });
+
+  const COLOR_PER_COMPONENT = {};
+
+  legendContents.forEach((legendContent: any) => {
+    const componentName = processMiroText(legendContent.text)
+      .trim()
+      .toLowerCase();
+    COLOR_PER_COMPONENT[componentName] = legendContent.style.backgroundColor;
+  });
+
+  const filteredMiroContents = MiroContents.data.data.filter(
+    (MiroContent: any) => {
+      return !miroContentsLegendIds.includes(MiroContent.id);
+    }
+  );
+
+  const texts = filteredMiroContents.filter((content: any) => {
+    return (
+      content.style.backgroundColor === COLOR_PER_COMPONENT[ContentTypes.TEXT]
+    );
+  });
+
   const miroTexts = texts.map((text: any) => {
     return new MiroText(
       text.id,
@@ -74,10 +91,12 @@ async function readFlowFromMiro(
       text.height
     );
   });
-  const buttons = MiroContents.data.data.filter((content: any) => {
+  const buttons = filteredMiroContents.filter((content: any) => {
     return (
-      content.style.backgroundColor === COLORS_PER_COMPONENT.BUTTON ||
-      content.style.backgroundColor === COLORS_PER_COMPONENT.QUICK_REPLY
+      content.style.backgroundColor ===
+        COLOR_PER_COMPONENT[ContentTypes.BUTTON] ||
+      content.style.backgroundColor ===
+        COLOR_PER_COMPONENT[ContentTypes.QUICK_REPLY]
     );
   });
   const miroButtons = buttons.map((button: any) => {
@@ -90,19 +109,19 @@ async function readFlowFromMiro(
     );
   });
 
-  const subflowConnectors = MiroContents.data.data.filter((content: any) => {
+  const subflowConnectors = filteredMiroContents.filter((content: any) => {
     return (
       content.style.backgroundColor ===
-        COLORS_PER_COMPONENT.SUBFLOW_CONNECTOR ||
+        COLOR_PER_COMPONENT[ContentTypes.SUBFLOW_CONNECTOR] ||
       content.style.backgroundColor ===
-        COLORS_PER_COMPONENT.START_OF_SUBFLOW_CONNECTOR
+        COLOR_PER_COMPONENT[ContentTypes.START_OF_SUBFLOW_CONNECTOR]
     );
   });
   const miroSubflowConnectors = subflowConnectors.map(
     (subflowConnector: any) => {
       const contentType =
         subflowConnector.style.backgroundColor ===
-        COLORS_PER_COMPONENT.START_OF_SUBFLOW_CONNECTOR
+        COLOR_PER_COMPONENT[ContentTypes.START_OF_SUBFLOW_CONNECTOR]
           ? ContentTypes.START_OF_SUBFLOW_CONNECTOR
           : ContentTypes.SUBFLOW_CONNECTOR;
       return new MiroSubflowConnector(
@@ -113,9 +132,10 @@ async function readFlowFromMiro(
     }
   );
 
-  const componentNames = MiroContents.data.data.filter((content: any) => {
+  const componentNames = filteredMiroContents.filter((content: any) => {
     return (
-      content.style.backgroundColor === COLORS_PER_COMPONENT.COMPONENT_NAME
+      content.style.backgroundColor ===
+      COLOR_PER_COMPONENT[ContentTypes.COMPONENT_NAME]
     );
   });
 
@@ -383,7 +403,7 @@ async function writeFlowToContentful(
         manageContentfulContext,
         new ContentId(content.type as ContentType, content.id),
         {
-          [ContentFieldType.NAME]: generateRandomName(),
+          [ContentFieldType.NAME]: (content as MiroButton).name ?? content.text,
           [ContentFieldType.TEXT]: content.text,
           [ContentFieldType.TARGET]: (content as MiroButton).target?.id,
         }
@@ -408,14 +428,14 @@ async function main() {
     const flow = await readFlowFromMiro(miroBoardId, miroToken, usingMiroLinks);
     console.log("✅️ Miro flow imported");
     console.log("🖊️ Writing Miro flow to Contentful...");
-    // await writeFlowToContentful(
-    //   spaceId,
-    //   env,
-    //   contentfulManageToken,
-    //   contentfulDeliveryToken,
-    //   locale,
-    //   flow
-    // );
+    await writeFlowToContentful(
+      spaceId,
+      env,
+      contentfulManageToken,
+      contentfulDeliveryToken,
+      locale,
+      flow
+    );
     console.log("✅️ Miro Flow copied to Contentful");
   } catch (e) {}
 }
