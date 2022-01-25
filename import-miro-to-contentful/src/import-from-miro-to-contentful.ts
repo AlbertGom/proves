@@ -95,7 +95,6 @@ async function readFlowFromMiro(
   nameButtons(miroContents);
 
   const finalContents = getFinalContents(miroContents);
-  miroContents;
 
   return finalContents;
 }
