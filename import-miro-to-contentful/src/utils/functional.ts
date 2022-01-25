@@ -1,5 +1,5 @@
-import { Y_MARGIN } from "./import-from-miro-to-contentful";
-import { Coordinate } from "./miro";
+import { Y_MARGIN } from "../import-from-miro-to-contentful";
+import { Coordinate } from "../miro";
 
 export function processMiroText(miroText: string): string {
   miroText = removeTags(miroText);

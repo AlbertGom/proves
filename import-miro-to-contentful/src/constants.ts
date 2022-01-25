@@ -1,6 +1,6 @@
 import { ContentType, ButtonsStyle } from "./miro";
 
-export const MIRO_CONTENT_TYPES: Record<string, string> = {
+export const MIRO_WIDGETS_TYPES: Record<string, string> = {
   SHAPE: "shape",
   LINK: "line",
   FRAME: "frame",

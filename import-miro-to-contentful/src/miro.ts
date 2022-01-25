@@ -19,7 +19,7 @@ export class Coordinate {
   }
 }
 
-export class Link {
+export class MiroLink {
   readonly start: string;
   readonly end: string;
   constructor(start: string, end: string) {

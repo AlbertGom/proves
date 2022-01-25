@@ -1,26 +1,34 @@
-import axios from "axios";
-import { BUTTON_STYLES, ContentTypes, MIRO_CONTENT_TYPES } from "./constants";
+import { BUTTON_STYLES, ContentTypes, MIRO_WIDGETS_TYPES } from "./constants";
 import {
   ComponentName,
-  Coordinate,
   getContentById,
   getContentByText,
-  isQuickReply,
-  Link,
   MiroButton,
   MiroContent,
   MiroSubflowConnector,
   MiroText,
+  MiroLink,
 } from "./miro";
 import { ContentId, ContentType } from "@botonic/plugin-contentful";
 import { ManageContentful } from "@botonic/plugin-contentful/lib/contentful/manage";
-import {
-  generateRandomName,
-  processMiroText,
-  elementNearToElement,
-} from "./utils";
+import { generateRandomName, elementNearToElement } from "./utils/functional";
 import { ContentFieldType } from "@botonic/plugin-contentful/lib/manage-cms/fields";
 import * as contentful from "contentful";
+import { MiroApiService } from "./miro-api-service";
+import {
+  getColorPerComponentObject,
+  getComponentNames,
+  getFinalContents,
+  getFlowContents,
+  getMiroButtons,
+  getMiroLinks,
+  getMiroTexts,
+  getSubflowConnectors,
+  linkButtonsAndTextsNotLinkedDirectly,
+  linkComponents,
+  nameButtons,
+  nameTextsWithoutName,
+} from "./utils/miro";
 
 if (process.argv.length < 9 || process.argv[2] == "--help") {
   console.log(`Usage: `);
@@ -36,303 +44,60 @@ async function readFlowFromMiro(
   miroToken: string,
   usingMiroLinks: boolean
 ): Promise<MiroContent[]> {
-  const miroUrl = `https://api.miro.com/v1/boards/${miroBoardId}=/widgets/`;
+  const Miro = new MiroApiService(miroToken, miroBoardId);
 
-  const MiroContentsLegend = await axios({
-    method: "get",
-    url: miroUrl,
-    headers: { Authorization: `Bearer ${miroToken}` },
-    params: { widgetType: MIRO_CONTENT_TYPES.FRAME },
-  });
+  const MiroContentsLegend = await Miro.readWidgets(MIRO_WIDGETS_TYPES.FRAME);
 
-  const miroContentsLegendIds = MiroContentsLegend.data.data[0].children.map(
-    (miroContentLegendId: any) => {
-      return miroContentLegendId;
-    }
+  const MiroContents = await Miro.readWidgets(MIRO_WIDGETS_TYPES.SHAPE);
+
+  const Links = await Miro.readWidgets(MIRO_WIDGETS_TYPES.LINK);
+
+  const COLOR_PER_COMPONENT = getColorPerComponentObject(
+    MiroContents,
+    MiroContentsLegend
   );
 
-  const MiroContents = await axios({
-    method: "get",
-    url: miroUrl,
-    headers: { Authorization: `Bearer ${miroToken}` },
-    params: { widgetType: MIRO_CONTENT_TYPES.SHAPE },
-  });
+  const flowContents = getFlowContents(MiroContents, MiroContentsLegend);
 
-  const legendContents = MiroContents.data.data.filter((MiroContent: any) => {
-    return miroContentsLegendIds.includes(MiroContent.id);
-  });
+  const miroTexts = getMiroTexts(flowContents, COLOR_PER_COMPONENT);
 
-  const COLOR_PER_COMPONENT = {};
-
-  legendContents.forEach((legendContent: any) => {
-    const componentName = processMiroText(legendContent.text)
-      .trim()
-      .toLowerCase();
-    COLOR_PER_COMPONENT[componentName] = legendContent.style.backgroundColor;
-  });
-
-  const filteredMiroContents = MiroContents.data.data.filter(
-    (MiroContent: any) => {
-      return !miroContentsLegendIds.includes(MiroContent.id);
-    }
+  const miroButtons = getMiroButtons(
+    flowContents,
+    COLOR_PER_COMPONENT,
+    miroTexts,
+    usingMiroLinks
   );
 
-  const texts = filteredMiroContents.filter((content: any) => {
-    return (
-      content.style.backgroundColor === COLOR_PER_COMPONENT[ContentTypes.TEXT]
-    );
-  });
-
-  const miroTexts = texts.map((text: any) => {
-    return new MiroText(
-      text.id,
-      processMiroText(text.text),
-      new Coordinate(text.x, text.y),
-      text.height
-    );
-  });
-  const buttons = filteredMiroContents.filter((content: any) => {
-    return (
-      content.style.backgroundColor ===
-        COLOR_PER_COMPONENT[ContentTypes.BUTTON] ||
-      content.style.backgroundColor ===
-        COLOR_PER_COMPONENT[ContentTypes.QUICK_REPLY]
-    );
-  });
-  const miroButtons = buttons.map((button: any) => {
-    return new MiroButton(
-      button.id,
-      processMiroText(button.text),
-      isQuickReply(button.style.backgroundColor),
-      new Coordinate(button.x, button.y),
-      button.height
-    );
-  });
-
-  const subflowConnectors = filteredMiroContents.filter((content: any) => {
-    return (
-      content.style.backgroundColor ===
-        COLOR_PER_COMPONENT[ContentTypes.SUBFLOW_CONNECTOR] ||
-      content.style.backgroundColor ===
-        COLOR_PER_COMPONENT[ContentTypes.START_OF_SUBFLOW_CONNECTOR]
-    );
-  });
-  const miroSubflowConnectors = subflowConnectors.map(
-    (subflowConnector: any) => {
-      const contentType =
-        subflowConnector.style.backgroundColor ===
-        COLOR_PER_COMPONENT[ContentTypes.START_OF_SUBFLOW_CONNECTOR]
-          ? ContentTypes.START_OF_SUBFLOW_CONNECTOR
-          : ContentTypes.SUBFLOW_CONNECTOR;
-      return new MiroSubflowConnector(
-        subflowConnector.id,
-        processMiroText(subflowConnector.text),
-        contentType
-      );
-    }
+  const miroSubflowConnectors = getSubflowConnectors(
+    flowContents,
+    COLOR_PER_COMPONENT
   );
 
-  const componentNames = filteredMiroContents.filter((content: any) => {
-    return (
-      content.style.backgroundColor ===
-      COLOR_PER_COMPONENT[ContentTypes.COMPONENT_NAME]
-    );
-  });
+  const miroComponentNames = getComponentNames(
+    flowContents,
+    COLOR_PER_COMPONENT
+  );
 
-  const miroComponentNames = componentNames.map((componentName: any) => {
-    return new ComponentName(
-      componentName.id,
-      processMiroText(componentName.text)
-    );
-  });
+  const miroLinks = getMiroLinks(Links);
 
-  const Links = await axios({
-    method: "get",
-    url: miroUrl,
-    headers: { Authorization: `Bearer ${miroToken}` },
-    params: { widgetType: MIRO_CONTENT_TYPES.LINK },
-  });
-
-  const miroLinks = Links.data.data.map((link: any) => {
-    return new Link(link.startWidget.id, link.endWidget.id);
-  });
-
-  if (!usingMiroLinks) {
-    miroTexts.forEach((miroText: MiroText) => {
-      miroButtons.forEach((miroButton: MiroButton) => {
-        if (
-          elementNearToElement(
-            miroButton.coordinates,
-            miroText.coordinates,
-            X_MARGIN,
-            miroText.textHeight
-          )
-        ) {
-          miroButton.belongsTo = miroText;
-          miroText.buttonsStyle = miroButton.quickReply
-            ? BUTTON_STYLES.QUICK_REPLIES
-            : BUTTON_STYLES.BUTTONS;
-        }
-      });
-    });
-
-    miroButtons.forEach((miroButton: MiroButton) => {
-      miroButtons.forEach((miroButtonSubElement: MiroButton) => {
-        if (
-          elementNearToElement(
-            miroButtonSubElement.coordinates,
-            miroButton.coordinates,
-            X_MARGIN,
-            miroButton.textHeight
-          )
-        ) {
-          if (miroButton.belongsTo) {
-            miroButtonSubElement.belongsTo = miroButton.belongsTo;
-          }
-        }
-      });
-    });
-  }
-
-  miroButtons.forEach((miroButton: MiroButton) => {
-    const miroText = getContentById(miroTexts, miroButton.belongsTo.id);
-    (miroText as MiroText).buttons.push(miroButton);
-  });
-
-  let miroContents: MiroContent[] = miroTexts.concat(
+  let miroContents: MiroContent[] = (miroTexts as MiroContent[]).concat(
     miroButtons,
     miroSubflowConnectors,
     miroComponentNames
   );
 
-  miroLinks.forEach((link: Link) => {
-    const origin = getContentById(miroContents, link.start);
-    const end = getContentById(miroContents, link.end);
+  linkComponents(miroContents, miroLinks, usingMiroLinks);
 
-    if (origin && origin.type === ContentTypes.TEXT) {
-      if (end && end.type === ContentTypes.TEXT) {
-        (origin as MiroText).followup = end as MiroText;
-      } else if (end && end.type === ContentTypes.BUTTON) {
-        if (usingMiroLinks) {
-          (origin as MiroText).buttons.push(end as MiroButton);
-          if ((end as MiroButton).quickReply) {
-            (origin as MiroText).buttonsStyle = BUTTON_STYLES.QUICK_REPLIES;
-          } else {
-            (origin as MiroText).buttonsStyle = BUTTON_STYLES.BUTTONS;
-          }
-        }
-      } else if (end && end.type === ContentTypes.SUBFLOW_CONNECTOR) {
-        (end as MiroSubflowConnector).connectsTo = origin as MiroText;
-      }
-    } else if (origin && origin.type === ContentTypes.BUTTON) {
-      if (end && end.type === ContentTypes.TEXT) {
-        (origin as MiroButton).target = end as MiroText;
-      } else if (end && end.type === ContentTypes.SUBFLOW_CONNECTOR) {
-        (end as MiroSubflowConnector).connectsTo = origin as MiroButton;
-      } else if (end && end.type === ContentTypes.COMPONENT_NAME) {
-        (end as ComponentName).referencedBy = origin as MiroButton;
-      }
-    } else if (
-      origin &&
-      origin.type == ContentTypes.START_OF_SUBFLOW_CONNECTOR
-    ) {
-      if (end && end.type === ContentTypes.TEXT) {
-        (origin as MiroSubflowConnector).connectsTo = end as MiroText;
-      }
-    } else if (origin && origin.type === ContentTypes.COMPONENT_NAME) {
-      if (end && end.type === ContentTypes.TEXT) {
-        (origin as ComponentName).references = end as MiroText;
-        (end as MiroText).name = origin.text;
-      }
-    } else return;
-  });
+  linkButtonsAndTextsNotLinkedDirectly(miroContents);
 
-  miroContents.forEach((miroContent: MiroContent) => {
-    if (miroContent.type === ContentTypes.SUBFLOW_CONNECTOR) {
-      const startOfSubflow = getContentByText(
-        miroContents,
-        miroContent.text,
-        ContentTypes.START_OF_SUBFLOW_CONNECTOR
-      );
-      if (!startOfSubflow) {
-        return;
-      }
-      const origin = getContentById(
-        miroContents,
-        (miroContent as MiroSubflowConnector).connectsTo.id
-      );
-      const end = getContentById(
-        miroContents,
-        (startOfSubflow as MiroSubflowConnector).connectsTo.id
-      );
-      if (origin.type === ContentTypes.BUTTON) {
-        (origin as MiroButton).target = end as MiroText;
-      } else if (origin.type === ContentTypes.TEXT) {
-        (origin as MiroText).followup = end as MiroText;
-      }
-    } else if (miroContent.type === ContentTypes.COMPONENT_NAME) {
-      if ((miroContent as ComponentName).referencedBy) {
-        const button = getContentById(
-          miroContents,
-          (miroContent as ComponentName).referencedBy.id
-        );
-        const text = getContentById(
-          miroContents,
-          (miroContent as ComponentName).references.id
-        );
-        if (button && text) {
-          (button as MiroButton).target = text as MiroText;
-        }
-      }
-    }
-  });
+  nameTextsWithoutName(miroContents);
 
-  const textsWithNames = miroContents.filter((miroContent: MiroContent) => {
-    return (
-      miroContent.type === ContentTypes.TEXT && (miroContent as MiroText).name
-    );
-  });
+  nameButtons(miroContents);
 
-  textsWithNames.forEach((textWithName: MiroText) => {
-    nameFollowups(textWithName, 1, textWithName.name);
-  });
+  const finalContents = getFinalContents(miroContents);
+  miroContents;
 
-  const textsWithButtons = miroContents.filter((miroContent: MiroContent) => {
-    return (
-      miroContent.type === ContentTypes.TEXT &&
-      (miroContent as MiroText).buttons.length
-    );
-  });
-
-  textsWithButtons.forEach((textWithButtons: MiroText) => {
-    if (textWithButtons.name) {
-      textWithButtons.buttons.forEach((button: MiroButton, index: number) => {
-        const treeLevel = parseInt(textWithButtons.name.split(" ")[0]);
-        button.name = !Number.isNaN(treeLevel)
-          ? `${treeLevel}.${index + 1} ${button.text}`
-          : `${textWithButtons.name} button_${index + 1}`;
-      });
-    }
-  });
-
-  miroContents = miroContents.filter((miroContent: MiroContent) => {
-    return (
-      miroContent.type === ContentTypes.BUTTON ||
-      miroContent.type === ContentTypes.TEXT
-    );
-  });
-
-  return miroContents;
-}
-
-function nameFollowups(
-  miroText: MiroText,
-  index: number,
-  baseName: string
-): void {
-  if (!miroText.followup) return;
-  miroText.followup.name = `${baseName} Followup ${index}`;
-  nameFollowups(miroText.followup, index + 1, baseName);
+  return finalContents;
 }
 
 async function writeFlowToContentful(
