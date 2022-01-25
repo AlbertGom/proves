@@ -1,17 +1,8 @@
-import { BUTTON_STYLES, ContentTypes, MIRO_WIDGETS_TYPES } from "./constants";
-import {
-  ComponentName,
-  getContentById,
-  getContentByText,
-  MiroButton,
-  MiroContent,
-  MiroSubflowConnector,
-  MiroText,
-  MiroLink,
-} from "./miro";
+import { ContentTypes, MIRO_WIDGETS_TYPES } from "./constants";
+import { MiroButton, MiroContent, MiroText } from "./miro";
 import { ContentId, ContentType } from "@botonic/plugin-contentful";
 import { ManageContentful } from "@botonic/plugin-contentful/lib/contentful/manage";
-import { generateRandomName, elementNearToElement } from "./utils/functional";
+import { generateRandomName } from "./utils/functional";
 import { ContentFieldType } from "@botonic/plugin-contentful/lib/manage-cms/fields";
 import * as contentful from "contentful";
 import { MiroApiService } from "./miro-api-service";
