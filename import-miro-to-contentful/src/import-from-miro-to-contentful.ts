@@ -7,6 +7,7 @@ import { ContentFieldType } from "@botonic/plugin-contentful/lib/manage-cms/fiel
 import * as contentful from "contentful";
 import { MiroApiService } from "./miro-api-service";
 import {
+  renameRepeatedNames,
   getColorPerComponentObject,
   getComponentNames,
   getFinalContents,
@@ -20,12 +21,6 @@ import {
   nameButtons,
   nameTextsWithoutName,
 } from "./utils/miro";
-
-if (process.argv.length < 9 || process.argv[2] == "--help") {
-  console.log(`Usage: `);
-  // eslint-disable-next-line no-process-exit
-  process.exit(1);
-}
 
 export const X_MARGIN = 50;
 export const Y_MARGIN = 30;
@@ -43,30 +38,30 @@ async function readFlowFromMiro(
 
   const Links = await Miro.readWidgets(MIRO_WIDGETS_TYPES.LINK);
 
-  const COLOR_PER_COMPONENT = getColorPerComponentObject(
+  const componentsColors = getColorPerComponentObject(
     MiroContents,
     MiroContentsLegend
   );
 
   const flowContents = getFlowContents(MiroContents, MiroContentsLegend);
 
-  const miroTexts = getMiroTexts(flowContents, COLOR_PER_COMPONENT);
+  const miroTexts = getMiroTexts(flowContents, componentsColors.color);
 
   const miroButtons = getMiroButtons(
     flowContents,
-    COLOR_PER_COMPONENT,
+    componentsColors,
     miroTexts,
     usingMiroLinks
   );
 
   const miroSubflowConnectors = getSubflowConnectors(
     flowContents,
-    COLOR_PER_COMPONENT
+    componentsColors.color
   );
 
   const miroComponentNames = getComponentNames(
     flowContents,
-    COLOR_PER_COMPONENT
+    componentsColors.color
   );
 
   const miroLinks = getMiroLinks(Links);
@@ -86,6 +81,8 @@ async function readFlowFromMiro(
   nameButtons(miroContents);
 
   const finalContents = getFinalContents(miroContents);
+
+  renameRepeatedNames(finalContents);
 
   return finalContents;
 }
@@ -128,41 +125,64 @@ async function writeFlowToContentful(
 
   for (const content of newContent) {
     const contentType = content.type as ContentType;
-    await manageContentful.createContent(
-      manageContentfulContext,
-      contentType,
-      content.id
-    );
+    try {
+      await manageContentful.createContent(
+        manageContentfulContext,
+        contentType,
+        content.id
+      );
+    } catch (e: any) {
+      console.log(
+        `🔴️ Error creating content with id ${content.id} of content type ${contentType}: `,
+        e
+      );
+    }
   }
 
   for (const content of flow) {
     if (content.type === ContentTypes.TEXT) {
-      await manageContentful.updateFields(
-        manageContentfulContext,
-        new ContentId(content.type as ContentType, content.id),
-        {
-          [ContentFieldType.NAME]:
-            (content as MiroText).name ?? generateRandomName(),
-          [ContentFieldType.TEXT]: content.text,
-          [ContentFieldType.BUTTONS]: (content as MiroText).buttons.map(
-            (button: MiroButton) => {
-              return button.id;
-            }
-          ),
-          [ContentFieldType.FOLLOW_UP]: (content as MiroText).followup?.id,
-          [ContentFieldType.BUTTONS_STYLE]: (content as MiroText).buttonsStyle,
-        }
-      );
+      try {
+        await manageContentful.updateFields(
+          manageContentfulContext,
+          new ContentId(content.type as ContentType, content.id),
+          {
+            [ContentFieldType.NAME]:
+              (content as MiroText).name ?? generateRandomName(),
+            [ContentFieldType.TEXT]: content.text,
+            [ContentFieldType.BUTTONS]: (content as MiroText).buttons.map(
+              (button: MiroButton) => {
+                return button.id;
+              }
+            ),
+            [ContentFieldType.FOLLOW_UP]: (content as MiroText).followup?.id,
+            [ContentFieldType.BUTTONS_STYLE]: (content as MiroText)
+              .buttonsStyle,
+          }
+        );
+      } catch (e: any) {
+        console.log(
+          `🔴️ Error updatig content with id ${content.id} of content type text: `,
+          e
+        );
+      }
     } else if (content.type === ContentTypes.BUTTON) {
-      await manageContentful.updateFields(
-        manageContentfulContext,
-        new ContentId(content.type as ContentType, content.id),
-        {
-          [ContentFieldType.NAME]: (content as MiroButton).name ?? content.text,
-          [ContentFieldType.TEXT]: content.text,
-          [ContentFieldType.TARGET]: (content as MiroButton).target?.id,
-        }
-      );
+      try {
+        await manageContentful.updateFields(
+          manageContentfulContext,
+          new ContentId(content.type as ContentType, content.id),
+          {
+            [ContentFieldType.NAME]:
+              (content as MiroButton).name ?? content.text,
+            [ContentFieldType.TEXT]: content.text,
+            [ContentFieldType.TARGET]: (content as MiroButton).target?.id,
+          }
+        );
+      } catch (e: any) {
+        console.log(
+          `🔴️ Error updating content with id ${content.id} of content type button: `,
+          e
+        );
+      }
     }
   }
 }
@@ -178,21 +198,53 @@ const locale = process.argv[9];
 
 async function main() {
   try {
-    console.log("📖️ Importing flow from Miro...");
-    const usingMiroLinks = usingMiroLinksParam === "true" ? true : false;
-    const flow = await readFlowFromMiro(miroBoardId, miroToken, usingMiroLinks);
-    console.log("✅️ Miro flow imported");
-    console.log("🖊️ Writing Miro flow to Contentful...");
-    await writeFlowToContentful(
-      spaceId,
-      env,
-      contentfulManageToken,
-      contentfulDeliveryToken,
-      locale,
-      flow
-    );
-    console.log("✅️ Miro Flow copied to Contentful");
+    if (incorrectParams()) {
+      showUsage();
+    } else {
+      console.log("📖️ Importing flow from Miro...");
+      const usingMiroLinks = usingMiroLinksParam === "true" ? true : false;
+      const flow = await readFlowFromMiro(
+        miroBoardId,
+        miroToken,
+        usingMiroLinks
+      );
+      console.log("✅️ Miro flow imported");
+      console.log("🖊️ Writing Miro flow to Contentful...");
+      await writeFlowToContentful(
+        spaceId,
+        env,
+        contentfulManageToken,
+        contentfulDeliveryToken,
+        locale,
+        flow
+      );
+      console.log("✅️ Miro Flow copied to Contentful");
+    }
   } catch (e) {}
+}
+
+function incorrectParams(): boolean {
+  return process.argv[2] == "--help";
+}
+
+function showUsage() {
+  console.log(`USAGE`);
+  console.log(
+    `----------------------------------------------------------------------`
+  );
+  console.log("First param: Miro Board Id");
+  console.log("Second param: Miro Access Token");
+  console.log(
+    "Third param: Using Miro Links? -> true if buttons are connected to texts through links instead of by position, otherwise false"
+  );
+  console.log("Fourth param: Contentful Space Id");
+  console.log("Fifth param: Contentful Environment");
+  console.log("Sixth param: Contentful Managament Token");
+  console.log("Seventh param: Contentful Delivery Token");
+  console.log("Eighth param: Contentful locale");
+  console.log();
+  // eslint-disable-next-line no-process-exit
+  process.exit(1);
 }
 
 void main();

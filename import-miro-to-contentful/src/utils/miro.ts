@@ -18,10 +18,12 @@ import {
   processMiroText,
 } from "./functional";
 
+export type ComponentColors = { color: Object; borderColor: Object };
+
 export function getColorPerComponentObject(
   MiroContents: any,
   MiroContentsLegend: any
-): Object {
+): ComponentColors {
   const miroContentsLegendIds = getLegendContentsId(MiroContentsLegend);
 
   const legendContents = MiroContents.filter((MiroContent: any) => {
@@ -29,14 +31,19 @@ export function getColorPerComponentObject(
   });
 
   const COLOR_PER_COMPONENT = {};
+  const BORDER_COLOR_PER_COMPONENT = {};
 
   legendContents.forEach((legendContent: any) => {
     const componentName = processMiroText(legendContent.text)
       .trim()
       .toLowerCase();
     COLOR_PER_COMPONENT[componentName] = legendContent.style.backgroundColor;
+    BORDER_COLOR_PER_COMPONENT[componentName] = legendContent.style.borderColor;
   });
-  return COLOR_PER_COMPONENT;
+  return {
+    color: COLOR_PER_COMPONENT,
+    borderColor: BORDER_COLOR_PER_COMPONENT,
+  };
 }
 
 export function getFlowContents(MiroContents: any, MiroContentsLegend: any) {
@@ -78,23 +85,26 @@ export function getMiroTexts(
 
 export function getMiroButtons(
   flowContents: any,
-  COLOR_PER_COMPONENT: Object,
+  componentColors: ComponentColors,
   miroTexts: MiroText[],
   usingMiroLinks: boolean
 ): MiroButton[] {
   const buttons = flowContents.filter((content: any) => {
     return (
       content.style.backgroundColor ===
-        COLOR_PER_COMPONENT[ContentTypes.BUTTON] ||
+        componentColors.color[ContentTypes.BUTTON] ||
       content.style.backgroundColor ===
-        COLOR_PER_COMPONENT[ContentTypes.QUICK_REPLY]
+        componentColors.color[ContentTypes.QUICK_REPLY]
     );
   });
   const miroButtons = buttons.map((button: any) => {
     return new MiroButton(
       button.id,
       processMiroText(button.text),
-      isQuickReply(button.style.backgroundColor),
+      isQuickReply(
+        button.style.borderColor,
+        componentColors.borderColor[ContentTypes.QUICK_REPLY]
+      ),
       new Coordinate(button.x, button.y),
       button.height
     );
@@ -245,6 +255,7 @@ export function linkComponents(
     ) {
       if (end && end.type === ContentTypes.TEXT) {
         (origin as MiroSubflowConnector).connectsTo = end as MiroText;
+        (end as MiroText).name = origin.text;
       }
     } else if (origin && origin.type === ContentTypes.COMPONENT_NAME) {
       if (end && end.type === ContentTypes.TEXT) {
@@ -346,7 +357,7 @@ export function nameButtons(miroContents: MiroContent[]) {
         const treeLevel = parseInt(textWithButtons.name.split(" ")[0]);
         button.name = !Number.isNaN(treeLevel)
           ? `${treeLevel}.${index + 1} ${button.text}`
-          : `${textWithButtons.name} button_${index + 1}`;
+          : `${index + 1}. ${button.text}`;
       });
     }
   });
@@ -360,4 +371,49 @@ export function getFinalContents(miroContents: MiroContent[]): MiroContent[] {
     );
   });
   return finalMiroContents;
+}
+
+export function renameRepeatedNames(contents: MiroContent[]) {
+  const buttons = contents.filter((content: MiroContent) => {
+    return content.type === ContentTypes.BUTTON;
+  });
+
+  const texts = contents.filter((content: MiroContent) => {
+    return content.type === ContentTypes.TEXT;
+  });
+
+  buttons.forEach((button: MiroButton) => {
+    const ids = getContentsWithRepeatedNames(buttons, button.name, button.id);
+    ids.forEach((id: string, index: number) => {
+      const button = getContentById(buttons, id);
+      (button as MiroButton).name = `${(button as MiroButton).name} ${
+        index + 2
+      }`;
+    });
+  });
+
+  texts.forEach((text: MiroText) => {
+    const ids = getContentsWithRepeatedNames(texts, text.name, text.id);
+    ids.forEach((id: string, index: number) => {
+      const text = getContentById(texts, id);
+      (text as MiroText).name = `${(text as MiroText).name} ${index + 2}`;
+    });
+  });
+}
+
+function getContentsWithRepeatedNames(
+  contents: MiroContent[],
+  contentName: string,
+  contentId: string
+): string[] {
+  let ids = [];
+  contents.forEach((content: MiroContent) => {
+    if (
+      contentName === (content as MiroText | MiroButton).name &&
+      contentId != content.id
+    ) {
+      ids.push(content.id);
+    }
+  });
+  return ids;
 }

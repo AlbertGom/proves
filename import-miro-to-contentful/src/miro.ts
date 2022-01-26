@@ -126,6 +126,9 @@ export function getContentByText(
   return content[0];
 }
 
-export function isQuickReply(backgroundColor: string): boolean {
-  return backgroundColor === COLORS_PER_COMPONENT.QUICK_REPLY ? true : false;
+export function isQuickReply(
+  borderColor: string,
+  quickReplyBorderColor: string
+): boolean {
+  return borderColor === quickReplyBorderColor;
 }

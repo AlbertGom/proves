@@ -2,7 +2,10 @@
 BIN_DIR=${0:a:h}
 cd "$BIN_DIR" || exit
 
-if [[ $# -lt 7 ]]; then
+if [[ $# -lt 8 ]]; then
+echo
+echo You introduced $# parameters, 8 parameters  are necessary to run the script.
+echo
 	../node_modules/.bin/ts-node --files ../src/import-from-miro-to-contentful.ts --help
 	exit 1
 fi
