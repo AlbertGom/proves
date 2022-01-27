@@ -379,7 +379,7 @@ function isTreeLevel(treeLevel: string): boolean {
   return TREE_LEVEL_REGEX.test(treeLevel);
 }
 
-export function getFinalContents(miroContents: MiroContent[]): MiroContent[] {
+export function getContentfulContents(miroContents: MiroContent[]): MiroContent[] {
   const finalMiroContents = miroContents.filter((miroContent: MiroContent) => {
     return (
       miroContent.type === ContentTypes.CONTENTFUL_BUTTON ||

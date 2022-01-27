@@ -10,7 +10,7 @@ import {
   renameRepeatedNames,
   getColorPerComponentObject,
   getComponentNames,
-  getFinalContents,
+  getContentfulContents,
   getFlowContents,
   getMiroButtons,
   getMiroLinks,
@@ -75,15 +75,15 @@ async function readFlowFromMiro(
 
   linkButtonsAndTextsNotLinkedDirectly(miroContents);
 
-  nameTextsWithoutName(miroContents);
+  const contentfulContents = getContentfulContents(miroContents);
 
-  nameButtons(miroContents);
+  nameTextsWithoutName(contentfulContents);
 
-  const finalContents = getFinalContents(miroContents);
+  nameButtons(contentfulContents);
 
-  renameRepeatedNames(finalContents);
+  renameRepeatedNames(contentfulContents);
 
-  return finalContents;
+  return contentfulContents;
 }
 
 async function writeFlowToContentful(
