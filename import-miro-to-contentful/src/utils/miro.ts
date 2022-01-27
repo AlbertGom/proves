@@ -358,13 +358,21 @@ export function nameButtons(miroContents: MiroContent[]) {
   textsWithButtons.forEach((textWithButtons: MiroText) => {
     if (textWithButtons.name) {
       textWithButtons.buttons.forEach((button: MiroButton, index: number) => {
-        const treeLevel = textWithButtons.name.split(" ")[0];
+        let treeLevel = textWithButtons.name.split(" ")[0];
+        treeLevel = addDotIfNecessary(treeLevel);
         button.name = isTreeLevel(treeLevel)
-          ? `${treeLevel}.${index + 1} ${button.text}`
+          ? `${treeLevel}${index + 1} ${button.text}`
           : `${index + 1}. ${button.text}`;
       });
     }
   });
+}
+
+function addDotIfNecessary(text: string) {
+  if (text[text.length - 1] != ".") {
+    text = text + ".";
+  }
+  return text;
 }
 
 function isTreeLevel(treeLevel: string): boolean {
