@@ -42,7 +42,6 @@ async function readFlowFromMiro(
     MiroContents,
     MiroContentsLegend
   );
-
   const flowContents = getFlowContents(MiroContents, MiroContentsLegend);
 
   const miroTexts = getMiroTexts(flowContents, componentsColors.color);
@@ -140,7 +139,7 @@ async function writeFlowToContentful(
   }
 
   for (const content of flow) {
-    if (content.type === ContentTypes.TEXT) {
+    if (content.type === ContentTypes.CONTENTFUL_TEXT) {
       try {
         await manageContentful.updateFields(
           manageContentfulContext,
@@ -165,7 +164,7 @@ async function writeFlowToContentful(
           e
         );
       }
-    } else if (content.type === ContentTypes.BUTTON) {
+    } else if (content.type === ContentTypes.CONTENTFUL_BUTTON) {
       try {
         await manageContentful.updateFields(
           manageContentfulContext,

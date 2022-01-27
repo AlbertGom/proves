@@ -1,14 +1,16 @@
-import { COLORS_PER_COMPONENT, ContentTypes } from "./constants";
+import { ContentTypes } from "./constants";
 
 export type ContentType =
   | "button"
-  | "text"
+  | "conversationalappmessage"
   | "payload"
   | "url"
-  | "subflow connector"
-  | "subflow start"
-  | "text name"
-  | "quick reply";
+  | "link to [flow name]"
+  | "[flow name]"
+  | "textname"
+  | "userinput_textname"
+  | "quickreply"
+  | "text";
 
 export class Coordinate {
   x: number;
@@ -75,7 +77,7 @@ export class MiroButton extends MiroContent {
     textHeight: number,
     belongsTo?: MiroText
   ) {
-    super(id, ContentTypes.BUTTON, text);
+    super(id, ContentTypes.CONTENTFUL_BUTTON, text);
     this.quickReply = quickReply;
     this.coordinates = coordinates;
     this.textHeight = textHeight;
@@ -98,7 +100,7 @@ export class MiroText extends MiroContent {
     coordinates: Coordinate,
     textHeight: number
   ) {
-    super(id, ContentTypes.TEXT, text);
+    super(id, ContentTypes.CONTENTFUL_TEXT, text);
     this.buttons = [];
     this.coordinates = coordinates;
     this.textHeight = textHeight;

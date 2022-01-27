@@ -7,14 +7,17 @@ export const MIRO_WIDGETS_TYPES: Record<string, string> = {
 };
 
 export const ContentTypes: Record<string, ContentType> = {
-  TEXT: "text",
+  TEXT: "conversationalappmessage",
   BUTTON: "button",
-  QUICK_REPLY: "quick reply",
+  QUICK_REPLY: "quickreply",
   PAYLOAD: "payload",
   URL: "url",
-  SUBFLOW_CONNECTOR: "subflow connector",
-  START_OF_SUBFLOW_CONNECTOR: "subflow start",
-  COMPONENT_NAME: "text name",
+  SUBFLOW_CONNECTOR: "link to [flow name]",
+  START_OF_SUBFLOW_CONNECTOR: "[flow name]",
+  COMPONENT_NAME: "textname",
+  USER_INPUT: "userinput_textname",
+  CONTENTFUL_TEXT: "text",
+  CONTENTFUL_BUTTON: "button",
 };
 
 export const BUTTON_STYLES: Record<string, ButtonsStyle> = {
@@ -33,3 +36,5 @@ export const COLORS_PER_COMPONENT = {
   START_OF_SUBFLOW_CONNECTOR: "#9510ac",
   COMPONENT_NAME: "#cee741",
 };
+
+export const TREE_LEVEL_REGEX = /^[\d.]+$/;

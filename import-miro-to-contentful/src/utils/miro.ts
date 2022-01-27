@@ -1,5 +1,5 @@
 import { X_MARGIN } from "../import-from-miro-to-contentful";
-import { BUTTON_STYLES, ContentTypes } from "../constants";
+import { BUTTON_STYLES, ContentTypes, TREE_LEVEL_REGEX } from "../constants";
 import {
   MiroText,
   MiroContent,
@@ -91,10 +91,14 @@ export function getMiroButtons(
 ): MiroButton[] {
   const buttons = flowContents.filter((content: any) => {
     return (
-      content.style.backgroundColor ===
+      ((content.style.backgroundColor ===
         componentColors.color[ContentTypes.BUTTON] ||
-      content.style.backgroundColor ===
-        componentColors.color[ContentTypes.QUICK_REPLY]
+        content.style.backgroundColor ===
+          componentColors.color[ContentTypes.QUICK_REPLY]) &&
+        content.style.borderColor ===
+          componentColors.borderColor[ContentTypes.BUTTON]) ||
+      content.style.borderColor ===
+        componentColors.borderColor[ContentTypes.QUICK_REPLY]
     );
   });
   const miroButtons = buttons.map((button: any) => {
@@ -182,7 +186,7 @@ export function getSubflowConnectors(
           : ContentTypes.SUBFLOW_CONNECTOR;
       return new MiroSubflowConnector(
         subflowConnector.id,
-        processMiroText(subflowConnector.text),
+        processMiroText(subflowConnector.text.replace("Link to ", "")),
         contentType
       );
     }
@@ -197,7 +201,9 @@ export function getComponentNames(
   const componentNames = flowContents.filter((content: any) => {
     return (
       content.style.backgroundColor ===
-      COLOR_PER_COMPONENT[ContentTypes.COMPONENT_NAME]
+        COLOR_PER_COMPONENT[ContentTypes.COMPONENT_NAME] ||
+      content.style.backgroundColor ===
+        COLOR_PER_COMPONENT[ContentTypes.USER_INPUT]
     );
   });
 
@@ -226,10 +232,10 @@ export function linkComponents(
     const origin = getContentById(miroContents, link.start);
     const end = getContentById(miroContents, link.end);
 
-    if (origin && origin.type === ContentTypes.TEXT) {
-      if (end && end.type === ContentTypes.TEXT) {
+    if (origin && origin.type === ContentTypes.CONTENTFUL_TEXT) {
+      if (end && end.type === ContentTypes.CONTENTFUL_TEXT) {
         (origin as MiroText).followup = end as MiroText;
-      } else if (end && end.type === ContentTypes.BUTTON) {
+      } else if (end && end.type === ContentTypes.CONTENTFUL_BUTTON) {
         if (usingMiroLinks) {
           (origin as MiroText).buttons.push(end as MiroButton);
           if ((end as MiroButton).quickReply) {
@@ -241,8 +247,8 @@ export function linkComponents(
       } else if (end && end.type === ContentTypes.SUBFLOW_CONNECTOR) {
         (end as MiroSubflowConnector).connectsTo = origin as MiroText;
       }
-    } else if (origin && origin.type === ContentTypes.BUTTON) {
-      if (end && end.type === ContentTypes.TEXT) {
+    } else if (origin && origin.type === ContentTypes.CONTENTFUL_BUTTON) {
+      if (end && end.type === ContentTypes.CONTENTFUL_TEXT) {
         (origin as MiroButton).target = end as MiroText;
       } else if (end && end.type === ContentTypes.SUBFLOW_CONNECTOR) {
         (end as MiroSubflowConnector).connectsTo = origin as MiroButton;
@@ -253,12 +259,12 @@ export function linkComponents(
       origin &&
       origin.type == ContentTypes.START_OF_SUBFLOW_CONNECTOR
     ) {
-      if (end && end.type === ContentTypes.TEXT) {
+      if (end && end.type === ContentTypes.CONTENTFUL_TEXT) {
         (origin as MiroSubflowConnector).connectsTo = end as MiroText;
         (end as MiroText).name = origin.text;
       }
     } else if (origin && origin.type === ContentTypes.COMPONENT_NAME) {
-      if (end && end.type === ContentTypes.TEXT) {
+      if (end && end.type === ContentTypes.CONTENTFUL_TEXT) {
         (origin as ComponentName).references = end as MiroText;
         (end as MiroText).name = origin.text;
       }
@@ -276,31 +282,29 @@ export function linkButtonsAndTextsNotLinkedDirectly(
         miroContent.text,
         ContentTypes.START_OF_SUBFLOW_CONNECTOR
       );
-      if (!startOfSubflow) {
-        return;
-      }
+
       const origin = getContentById(
         miroContents,
-        (miroContent as MiroSubflowConnector).connectsTo.id
+        (miroContent as MiroSubflowConnector)?.connectsTo?.id
       );
       const end = getContentById(
         miroContents,
-        (startOfSubflow as MiroSubflowConnector).connectsTo.id
+        (startOfSubflow as MiroSubflowConnector)?.connectsTo?.id
       );
-      if (origin.type === ContentTypes.BUTTON) {
+      if (origin?.type === ContentTypes.CONTENTFUL_BUTTON) {
         (origin as MiroButton).target = end as MiroText;
-      } else if (origin.type === ContentTypes.TEXT) {
+      } else if (origin?.type === ContentTypes.CONTENTFUL_TEXT) {
         (origin as MiroText).followup = end as MiroText;
       }
     } else if (miroContent.type === ContentTypes.COMPONENT_NAME) {
-      if ((miroContent as ComponentName).referencedBy) {
+      if ((miroContent as ComponentName)?.referencedBy) {
         const button = getContentById(
           miroContents,
-          (miroContent as ComponentName).referencedBy.id
+          (miroContent as ComponentName)?.referencedBy?.id
         );
         const text = getContentById(
           miroContents,
-          (miroContent as ComponentName).references.id
+          (miroContent as ComponentName)?.references?.id
         );
         if (button && text) {
           (button as MiroButton).target = text as MiroText;
@@ -312,7 +316,7 @@ export function linkButtonsAndTextsNotLinkedDirectly(
 
 export function nameTextsWithoutName(miroContents: MiroContent[]) {
   const miroTexts = miroContents.filter((miroContent: MiroContent) => {
-    return miroContent.type === ContentTypes.TEXT;
+    return miroContent.type === ContentTypes.CONTENTFUL_TEXT;
   });
 
   miroTexts.forEach((miroText: MiroText) => {
@@ -339,14 +343,14 @@ function nameFollowups(
 ): void {
   if (!miroText.followup) return;
   if (miroText.followup.name) return;
-  miroText.followup.name = `${baseName} Followup ${index}`;
+  miroText.followup.name = `${baseName} FU_${index}`;
   nameFollowups(miroText.followup, index + 1, baseName);
 }
 
 export function nameButtons(miroContents: MiroContent[]) {
   const textsWithButtons = miroContents.filter((miroContent: MiroContent) => {
     return (
-      miroContent.type === ContentTypes.TEXT &&
+      miroContent.type === ContentTypes.CONTENTFUL_TEXT &&
       (miroContent as MiroText).buttons.length
     );
   });
@@ -354,8 +358,8 @@ export function nameButtons(miroContents: MiroContent[]) {
   textsWithButtons.forEach((textWithButtons: MiroText) => {
     if (textWithButtons.name) {
       textWithButtons.buttons.forEach((button: MiroButton, index: number) => {
-        const treeLevel = parseInt(textWithButtons.name.split(" ")[0]);
-        button.name = !Number.isNaN(treeLevel)
+        const treeLevel = textWithButtons.name.split(" ")[0];
+        button.name = isTreeLevel(treeLevel)
           ? `${treeLevel}.${index + 1} ${button.text}`
           : `${index + 1}. ${button.text}`;
       });
@@ -363,11 +367,15 @@ export function nameButtons(miroContents: MiroContent[]) {
   });
 }
 
+function isTreeLevel(treeLevel: string): boolean {
+  return TREE_LEVEL_REGEX.test(treeLevel);
+}
+
 export function getFinalContents(miroContents: MiroContent[]): MiroContent[] {
   const finalMiroContents = miroContents.filter((miroContent: MiroContent) => {
     return (
-      miroContent.type === ContentTypes.BUTTON ||
-      miroContent.type === ContentTypes.TEXT
+      miroContent.type === ContentTypes.CONTENTFUL_BUTTON ||
+      miroContent.type === ContentTypes.CONTENTFUL_TEXT
     );
   });
   return finalMiroContents;
@@ -375,11 +383,11 @@ export function getFinalContents(miroContents: MiroContent[]): MiroContent[] {
 
 export function renameRepeatedNames(contents: MiroContent[]) {
   const buttons = contents.filter((content: MiroContent) => {
-    return content.type === ContentTypes.BUTTON;
+    return content.type === ContentTypes.CONTENTFUL_BUTTON;
   });
 
   const texts = contents.filter((content: MiroContent) => {
-    return content.type === ContentTypes.TEXT;
+    return content.type === ContentTypes.CONTENTFUL_TEXT;
   });
 
   buttons.forEach((button: MiroButton) => {
