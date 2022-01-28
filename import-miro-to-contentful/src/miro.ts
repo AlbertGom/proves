@@ -1,3 +1,4 @@
+import { generateRandomName } from "./utils/functional";
 import { ContentTypes } from "./constants";
 
 export type ContentType =
@@ -10,7 +11,8 @@ export type ContentType =
   | "textname"
   | "userinput_textname"
   | "quickreply"
-  | "text";
+  | "text"
+  | "image";
 
 export class Coordinate {
   x: number;
@@ -41,6 +43,16 @@ export class MiroContent {
   }
 }
 
+export class MiroImage extends MiroContent {
+  name?: string;
+  followup?: MiroText | MiroImage;
+  assetName?: string;
+  constructor(id: string, assetName?: string) {
+    super(id, ContentTypes.CONTENTFUL_IMAGE);
+    this.assetName = assetName != "" ? assetName : generateRandomName();
+  }
+}
+
 export class MiroSubflowConnector extends MiroContent {
   connectsTo?: MiroContent;
   constructor(
@@ -55,7 +67,7 @@ export class MiroSubflowConnector extends MiroContent {
 }
 
 export class ComponentName extends MiroContent {
-  references?: MiroText;
+  references?: MiroText | MiroImage;
   referencedBy?: MiroButton;
   constructor(id: string, text: string) {
     super(id, ContentTypes.COMPONENT_NAME, text);
@@ -63,7 +75,7 @@ export class ComponentName extends MiroContent {
 }
 
 export class MiroButton extends MiroContent {
-  target?: MiroText;
+  target?: MiroText | MiroImage;
   coordinates: Coordinate;
   readonly quickReply: boolean;
   textHeight: number;
@@ -92,7 +104,7 @@ export class MiroText extends MiroContent {
   coordinates: Coordinate;
   textHeight: number;
   name?: string;
-  followup?: MiroText;
+  followup?: MiroText | MiroImage;
   buttonsStyle?: ButtonsStyle;
   constructor(
     id: string,

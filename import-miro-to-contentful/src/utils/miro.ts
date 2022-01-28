@@ -11,12 +11,16 @@ import {
   MiroLink,
   getContentById,
   getContentByText,
+  MiroImage,
 } from "../miro";
 import {
   elementNearToElement,
   generateRandomName,
   processMiroText,
 } from "./functional";
+//import { ManageContentful } from "@botonic/plugin-contentful/lib/contentful/manage";
+//import { ManageContext } from "@botonic/plugin-contentful/lib/manage-cms/manage-context";
+//import * as Image from "./placeholder-image.png";
 
 export type ComponentColors = { color: Object; borderColor: Object };
 
@@ -81,6 +85,13 @@ export function getMiroTexts(
     );
   });
   return miroTexts;
+}
+
+export function getMiroImages(Images: any): MiroImage[] {
+  const miroImages = Images.map((image: any) => {
+    return new MiroImage(image.id, image.title);
+  });
+  return miroImages;
 }
 
 export function getMiroButtons(
@@ -234,7 +245,7 @@ export function linkComponents(
 
     if (origin && origin.type === ContentTypes.CONTENTFUL_TEXT) {
       if (end && end.type === ContentTypes.CONTENTFUL_TEXT) {
-        (origin as MiroText).followup = end as MiroText;
+        (origin as MiroText).followup = end;
       } else if (end && end.type === ContentTypes.CONTENTFUL_BUTTON) {
         if (usingMiroLinks) {
           (origin as MiroText).buttons.push(end as MiroButton);
@@ -245,11 +256,16 @@ export function linkComponents(
           }
         }
       } else if (end && end.type === ContentTypes.SUBFLOW_CONNECTOR) {
-        (end as MiroSubflowConnector).connectsTo = origin as MiroText;
+        (end as MiroSubflowConnector).connectsTo = origin;
+      } else if (end && end.type === ContentTypes.CONTENTFUL_IMAGE) {
+        (origin as MiroText).followup = end;
       }
     } else if (origin && origin.type === ContentTypes.CONTENTFUL_BUTTON) {
-      if (end && end.type === ContentTypes.CONTENTFUL_TEXT) {
-        (origin as MiroButton).target = end as MiroText;
+      if (
+        (end && end.type === ContentTypes.CONTENTFUL_TEXT) ||
+        end.type === ContentTypes.CONTENTFUL_IMAGE
+      ) {
+        (origin as MiroButton).target = end;
       } else if (end && end.type === ContentTypes.SUBFLOW_CONNECTOR) {
         (end as MiroSubflowConnector).connectsTo = origin as MiroButton;
       } else if (end && end.type === ContentTypes.COMPONENT_NAME) {
@@ -264,9 +280,21 @@ export function linkComponents(
         (end as MiroText).name = origin.text;
       }
     } else if (origin && origin.type === ContentTypes.COMPONENT_NAME) {
-      if (end && end.type === ContentTypes.CONTENTFUL_TEXT) {
-        (origin as ComponentName).references = end as MiroText;
-        (end as MiroText).name = origin.text;
+      if (
+        (end && end.type === ContentTypes.CONTENTFUL_TEXT) ||
+        end.type === ContentTypes.CONTENTFUL_IMAGE
+      ) {
+        (origin as ComponentName).references = end;
+        (end as MiroText | MiroImage).name = origin.text;
+      }
+    } else if (origin && origin.type === ContentTypes.CONTENTFUL_IMAGE) {
+      if (
+        (end && end.type === ContentTypes.CONTENTFUL_TEXT) ||
+        end.type === ContentTypes.CONTENTFUL_IMAGE
+      ) {
+        (origin as MiroImage).followup = end;
+      } else if (end && end.type === ContentTypes.SUBFLOW_CONNECTOR) {
+        (end as MiroSubflowConnector).connectsTo = origin;
       }
     } else return;
   });
@@ -293,7 +321,10 @@ export function linkButtonsAndTextsNotLinkedDirectly(
       );
       if (origin?.type === ContentTypes.CONTENTFUL_BUTTON) {
         (origin as MiroButton).target = end as MiroText;
-      } else if (origin?.type === ContentTypes.CONTENTFUL_TEXT) {
+      } else if (
+        origin?.type === ContentTypes.CONTENTFUL_TEXT ||
+        origin?.type === ContentTypes.CONTENTFUL_IMAGE
+      ) {
         (origin as MiroText).followup = end as MiroText;
       }
     } else if (miroContent.type === ContentTypes.COMPONENT_NAME) {
@@ -302,49 +333,52 @@ export function linkButtonsAndTextsNotLinkedDirectly(
           miroContents,
           (miroContent as ComponentName)?.referencedBy?.id
         );
-        const text = getContentById(
+        const referencedContent = getContentById(
           miroContents,
           (miroContent as ComponentName)?.references?.id
         );
-        if (button && text) {
-          (button as MiroButton).target = text as MiroText;
+        if (button && referencedContent) {
+          (button as MiroButton).target = referencedContent;
         }
       }
     }
   });
 }
 
-export function nameTextsWithoutName(miroContents: MiroContent[]) {
-  const miroTexts = miroContents.filter((miroContent: MiroContent) => {
-    return miroContent.type === ContentTypes.CONTENTFUL_TEXT;
+export function nameContentsWithoutName(miroContents: MiroContent[]) {
+  const contents = miroContents.filter((miroContent: MiroContent) => {
+    return (
+      miroContent.type === ContentTypes.CONTENTFUL_TEXT ||
+      miroContent.type === ContentTypes.CONTENTFUL_IMAGE
+    );
   });
 
-  miroTexts.forEach((miroText: MiroText) => {
-    if (!miroText.name && !isFollowup(miroTexts as MiroText[], miroText)) {
-      miroText.name = generateRandomName();
+  contents.forEach((content: MiroText) => {
+    if (!content.name && !isFollowup(contents, content)) {
+      content.name = generateRandomName();
     }
-    nameFollowups(miroText, 1, miroText.name);
+    nameFollowups(content, 1, content.name);
   });
 }
 
-function isFollowup(miroTexts: MiroText[], miroText: MiroText): boolean {
-  const followUpTextsIds = miroTexts.map((miroText: MiroText) => {
-    if (miroText.followup) {
-      return miroText.followup.id;
+function isFollowup(contents: MiroContent[], content: MiroContent): boolean {
+  const followUpTextsIds = contents.map((content: MiroText) => {
+    if (content.followup) {
+      return content.followup.id;
     }
   });
-  return followUpTextsIds.includes(miroText.id);
+  return followUpTextsIds.includes(content.id);
 }
 
 function nameFollowups(
-  miroText: MiroText,
+  content: MiroText | MiroImage,
   index: number,
   baseName: string
 ): void {
-  if (!miroText.followup) return;
-  if (miroText.followup.name) return;
-  miroText.followup.name = `${baseName} FU_${index}`;
-  nameFollowups(miroText.followup, index + 1, baseName);
+  if (!content.followup) return;
+  if (content.followup.name) return;
+  content.followup.name = `${baseName} FU_${index}`;
+  nameFollowups(content.followup, index + 1, baseName);
 }
 
 export function nameButtons(miroContents: MiroContent[]) {
@@ -379,11 +413,14 @@ function isTreeLevel(treeLevel: string): boolean {
   return TREE_LEVEL_REGEX.test(treeLevel);
 }
 
-export function getContentfulContents(miroContents: MiroContent[]): MiroContent[] {
+export function getContentfulContents(
+  miroContents: MiroContent[]
+): MiroContent[] {
   const finalMiroContents = miroContents.filter((miroContent: MiroContent) => {
     return (
       miroContent.type === ContentTypes.CONTENTFUL_BUTTON ||
-      miroContent.type === ContentTypes.CONTENTFUL_TEXT
+      miroContent.type === ContentTypes.CONTENTFUL_TEXT ||
+      miroContent.type === ContentTypes.CONTENTFUL_IMAGE
     );
   });
   return finalMiroContents;
@@ -433,3 +470,28 @@ function getContentsWithRepeatedNames(
   });
   return ids;
 }
+
+// export async function createPlaceHolderAsset(
+//   manageContentful: ManageContentful,
+//   context: ManageContext
+// ): Promise<string> {
+//   const info = {
+//     description: "Placeholder image",
+//     fileName: "placeholder-image.jpg",
+//     name: "Placeholder image",
+//     type: "jpg",
+//   };
+
+//   let arrayBufferFile;
+//   var reader = new FileReader();
+//   reader.onload = function () {
+//     arrayBufferFile = reader.result;
+//   };
+
+//   reader.readAsBinaryString(Image);
+
+//   const id = (
+//     await manageContentful.createAsset(context, arrayBufferFile, info)
+//   ).id;
+//   return id;
+// }

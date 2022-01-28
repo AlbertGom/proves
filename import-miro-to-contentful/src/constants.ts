@@ -4,6 +4,7 @@ export const MIRO_WIDGETS_TYPES: Record<string, string> = {
   SHAPE: "shape",
   LINK: "line",
   FRAME: "frame",
+  IMAGE: "image",
 };
 
 export const ContentTypes: Record<string, ContentType> = {
@@ -18,6 +19,7 @@ export const ContentTypes: Record<string, ContentType> = {
   USER_INPUT: "userinput_textname",
   CONTENTFUL_TEXT: "text",
   CONTENTFUL_BUTTON: "button",
+  CONTENTFUL_IMAGE: "image",
 };
 
 export const BUTTON_STYLES: Record<string, ButtonsStyle> = {

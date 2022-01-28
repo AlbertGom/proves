@@ -1,5 +1,5 @@
 import { ContentTypes, MIRO_WIDGETS_TYPES } from "./constants";
-import { MiroButton, MiroContent, MiroText } from "./miro";
+import { MiroButton, MiroContent, MiroImage, MiroText } from "./miro";
 import { ContentId, ContentType } from "@botonic/plugin-contentful";
 import { ManageContentful } from "@botonic/plugin-contentful/lib/contentful/manage";
 import { generateRandomName } from "./utils/functional";
@@ -19,7 +19,9 @@ import {
   linkButtonsAndTextsNotLinkedDirectly,
   linkComponents,
   nameButtons,
-  nameTextsWithoutName,
+  getMiroImages,
+  nameContentsWithoutName,
+  //createPlaceHolderAsset,
 } from "./utils/miro";
 
 export const X_MARGIN = 50;
@@ -38,11 +40,15 @@ async function readFlowFromMiro(
 
   const Links = await Miro.readWidgets(MIRO_WIDGETS_TYPES.LINK);
 
+  const Images = await Miro.readWidgets(MIRO_WIDGETS_TYPES.IMAGE);
+
   const componentsColors = getColorPerComponentObject(
     MiroContents,
     MiroContentsLegend
   );
   const flowContents = getFlowContents(MiroContents, MiroContentsLegend);
+
+  const miroImages = getMiroImages(Images);
 
   const miroTexts = getMiroTexts(flowContents, componentsColors.color);
 
@@ -68,7 +74,8 @@ async function readFlowFromMiro(
   let miroContents: MiroContent[] = (miroTexts as MiroContent[]).concat(
     miroButtons,
     miroSubflowConnectors,
-    miroComponentNames
+    miroComponentNames,
+    miroImages
   );
 
   linkComponents(miroContents, miroLinks, usingMiroLinks);
@@ -77,7 +84,7 @@ async function readFlowFromMiro(
 
   const contentfulContents = getContentfulContents(miroContents);
 
-  nameTextsWithoutName(contentfulContents);
+  nameContentsWithoutName(contentfulContents);
 
   nameButtons(contentfulContents);
 
@@ -117,6 +124,11 @@ async function writeFlowToContentful(
     preview: false,
     locale: locale,
   };
+
+  // const placeHolderAssetId = await createPlaceHolderAsset(
+  //   manageContentful,
+  //   manageContentfulContext
+  // );
 
   const newContent = flow.filter((content: MiroContent) => {
     return !actualContentfulEntries.includes(content.id);
@@ -171,7 +183,9 @@ async function writeFlowToContentful(
           new ContentId(content.type as ContentType, content.id),
           {
             [ContentFieldType.NAME]:
-              (content as MiroButton).name ?? content.text,
+              (content as MiroButton).name ??
+              content.text ??
+              generateRandomName(),
             [ContentFieldType.TEXT]: content.text,
             [ContentFieldType.TARGET]: (content as MiroButton).target?.id,
           }
@@ -179,6 +193,25 @@ async function writeFlowToContentful(
       } catch (e: any) {
         console.log(
           `🔴️ Error updating content with id ${content.id} of content type button: `,
+          e
+        );
+      }
+    } else if (content.type === ContentTypes.CONTENTFUL_IMAGE) {
+      try {
+        await manageContentful.updateFields(
+          manageContentfulContext,
+          new ContentId(content.type as ContentType, content.id),
+          {
+            [ContentFieldType.NAME]:
+              (content as MiroImage).name ?? generateRandomName(),
+            [ContentFieldType.FOLLOW_UP]: (content as MiroText | MiroImage)
+              .followup?.id,
+            [ContentFieldType.IMAGE]: "2XVNK7ZwLTmKZFiugUBuIU",
+          }
+        );
+      } catch (e: any) {
+        console.log(
+          `🔴️ Error updatig content with id ${content.id} of content type text: `,
           e
         );
       }
