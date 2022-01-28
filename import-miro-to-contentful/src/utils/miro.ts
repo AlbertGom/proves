@@ -18,9 +18,11 @@ import {
   generateRandomName,
   processMiroText,
 } from "./functional";
-//import { ManageContentful } from "@botonic/plugin-contentful/lib/contentful/manage";
-//import { ManageContext } from "@botonic/plugin-contentful/lib/manage-cms/manage-context";
-//import * as Image from "./placeholder-image.png";
+import { ManageContentful } from "@botonic/plugin-contentful/lib/contentful/manage";
+import { ManageContext } from "@botonic/plugin-contentful/lib/manage-cms/manage-context";
+import fs from "fs";
+import path from "path";
+//import Image from "./placeholder-image.png";
 
 export type ComponentColors = { color: Object; borderColor: Object };
 
@@ -471,27 +473,27 @@ function getContentsWithRepeatedNames(
   return ids;
 }
 
-// export async function createPlaceHolderAsset(
-//   manageContentful: ManageContentful,
-//   context: ManageContext
-// ): Promise<string> {
-//   const info = {
-//     description: "Placeholder image",
-//     fileName: "placeholder-image.jpg",
-//     name: "Placeholder image",
-//     type: "jpg",
-//   };
+export async function createPlaceHolderAsset(
+  manageContentful: ManageContentful,
+  context: ManageContext
+): Promise<string> {
+  const info = {
+    description: "Placeholder image",
+    fileName: "placeholder-image.png",
+    name: "Placeholder image",
+    type: "png",
+  };
 
-//   let arrayBufferFile;
-//   var reader = new FileReader();
-//   reader.onload = function () {
-//     arrayBufferFile = reader.result;
-//   };
+  let data;
+  try {
+    data = fs.readFileSync(
+      path.resolve(__dirname, "../placeholder-image.png"),
+      "utf8"
+    );
+  } catch (err) {
+    console.error(err);
+  }
 
-//   reader.readAsBinaryString(Image);
-
-//   const id = (
-//     await manageContentful.createAsset(context, arrayBufferFile, info)
-//   ).id;
-//   return id;
-// }
+  const id = (await manageContentful.createAsset(context, data, info)).id;
+  return id;
+}

@@ -21,7 +21,7 @@ import {
   nameButtons,
   getMiroImages,
   nameContentsWithoutName,
-  //createPlaceHolderAsset,
+  createPlaceHolderAsset,
 } from "./utils/miro";
 
 export const X_MARGIN = 50;
@@ -125,10 +125,10 @@ async function writeFlowToContentful(
     locale: locale,
   };
 
-  // const placeHolderAssetId = await createPlaceHolderAsset(
-  //   manageContentful,
-  //   manageContentfulContext
-  // );
+  const placeHolderAssetId = await createPlaceHolderAsset(
+    manageContentful,
+    manageContentfulContext
+  );
 
   const newContent = flow.filter((content: MiroContent) => {
     return !actualContentfulEntries.includes(content.id);
@@ -252,7 +252,9 @@ async function main() {
       );
       console.log("✅️ Miro Flow copied to Contentful");
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error(e);
+  }
 }
 
 function incorrectParams(): boolean {
